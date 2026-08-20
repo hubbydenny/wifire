@@ -1,0 +1,4 @@
+*.o
+wifire
+compile_commands.json
+.clangd
