@@ -2,3 +2,7 @@
 wifire
 compile_commands.json
 .clangd
+.cache/
+imgui.ini
+TODOLIST.txt
+src/main.cpp
