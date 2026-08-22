@@ -72,6 +72,7 @@ static std::string g_wlanIface;
 static std::mutex g_wlanMutex;
 
 static std::string g_connectedSsid;
+static std::string g_connectStatus;
 static std::mutex g_connMutex;
 
 static GLFWwindow* g_window = nullptr;
@@ -146,6 +147,19 @@ bool connect_wifi(const char* iface, const char* ssid, const char* password) {
         "wpa_cli -i " + std::string(iface) + " select_network $NET 2>/dev/null; "
         "wpa_cli -i " + std::string(iface) + " save_config 2>/dev/null";
     return system(cmd.c_str()) == 0;
+}
+
+bool verify_connection(const char* iface, int timeout_sec) {
+    for (int i = 0; i < timeout_sec; i++) {
+        std::string out = exec(("wpa_cli -i " + std::string(iface) + " status 2>/dev/null").c_str());
+        if (out.find("wpa_state=COMPLETED") != std::string::npos &&
+            out.find("ip_address=") != std::string::npos) {
+            std::string ping = exec("ping -c 1 -W 2 8.8.8.8 2>/dev/null");
+            return ping.find("1 received") != std::string::npos;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    return false;
 }
 
 std::string getConnectedSsid(const char* iface) {
@@ -356,7 +370,11 @@ int main() {
 
             {
                 std::lock_guard<std::mutex> lock(g_connMutex);
-                if (!g_connectedSsid.empty()) {
+                if (g_connectStatus == "connecting") {
+                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "%s...", loc().connecting);
+                } else if (g_connectStatus == "failed") {
+                    ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "%s", loc().connectFailed);
+                } else if (!g_connectedSsid.empty()) {
                     ImGui::TextColored(ImVec4(0, 1, 0, 1), "%s: %s", loc().connected, g_connectedSsid.c_str());
                 } else {
                     ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "%s", loc().notConnected);
@@ -426,17 +444,25 @@ int main() {
                     ImGui::CloseCurrentPopup();
                 ImGui::Separator();
                 if (ImGui::Button(loc().connect, ImVec2(120, 0))) {
-                    std::string w;
+                    std::string w = g_wlanIface;
+                    std::string ssid = connectSsid;
+                    std::string pass = passBuf;
                     {
-                        std::lock_guard<std::mutex> lock(g_wlanMutex);
-                        w = g_wlanIface;
+                        std::lock_guard<std::mutex> lock(g_connMutex);
+                        g_connectStatus = "connecting";
                     }
-                    if (!w.empty()) {
-                        connect_wifi(w.c_str(), connectSsid.c_str(), passBuf);
-                        Config::lastSsid = connectSsid;
-                        Config::lastPassword = passBuf;
-                        saveConfig();
-                    }
+                    std::thread([w, ssid, pass]() {
+                        connect_wifi(w.c_str(), ssid.c_str(), pass.c_str());
+                        bool ok = verify_connection(w.c_str(), 15);
+                        {
+                            std::lock_guard<std::mutex> lock(g_connMutex);
+                            g_connectStatus = ok ? ssid : "failed";
+                            if (ok) g_connectedSsid = ssid;
+                        }
+                    }).detach();
+                    Config::lastSsid = connectSsid;
+                    Config::lastPassword = passBuf;
+                    saveConfig();
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::SameLine();

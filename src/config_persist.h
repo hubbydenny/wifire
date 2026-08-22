@@ -260,6 +260,8 @@ struct LocStrings {
     const char* autostart;
     const char* scanInterval;
     const char* connected;
+    const char* connecting;
+    const char* connectFailed;
     const char* notConnected;
     const char* noWireless;
 };
@@ -276,7 +278,7 @@ static const LocStrings g_en = {
     "Font Size", "Font Size (restart to apply)",
     "Language", "Auto-connect to last network",
     "Autostart on login", "Scan interval (sec)",
-    "Connected", "Not connected", "No wireless interface"
+    "Connected", "Connecting", "Connection failed", "Not connected", "No wireless interface"
 };
 
 static const LocStrings g_ru = {
@@ -291,7 +293,7 @@ static const LocStrings g_ru = {
     "Размер шрифта", "Размер шрифта (перезапуск)",
     "Язык", "Автоподключение к последней сети",
     "Автозапуск при входе", "Интервал сканирования (сек)",
-    "Подключено", "Не подключено", "Нет беспроводного интерфейса"
+    "Подключено", "Подключение...", "Ошибка подключения", "Не подключено", "Нет беспроводного интерфейса"
 };
 
 static inline const LocStrings& loc() {
