@@ -105,9 +105,8 @@ std::string find_wireless_iface() {
     return "";
 }
 
-std::vector<WifiNetwork_t> scan_wifi(const char* iface) {
+static std::vector<WifiNetwork_t> parseScanOutput(const std::string& out) {
     std::vector<WifiNetwork_t> networks;
-    std::string out = exec(("iw dev " + std::string(iface) + " scan 2>/dev/null").c_str());
     std::string ssid;
     size_t pos = 0;
     while (pos < out.size()) {
@@ -128,6 +127,14 @@ std::vector<WifiNetwork_t> scan_wifi(const char* iface) {
         }
     }
     return networks;
+}
+
+std::vector<WifiNetwork_t> scan_dump(const char* iface) {
+    return parseScanOutput(exec(("iw dev " + std::string(iface) + " scan dump 2>/dev/null").c_str()));
+}
+
+std::vector<WifiNetwork_t> scan_wifi(const char* iface) {
+    return parseScanOutput(exec(("iw dev " + std::string(iface) + " scan -u 2>/dev/null").c_str()));
 }
 
 bool connect_wifi(const char* iface, const char* ssid, const char* password) {
@@ -207,6 +214,17 @@ int main() {
         g_wlanIface = find_wireless_iface();
     }
 
+    if (!g_wlanIface.empty()) {
+        auto cached = scan_dump(g_wlanIface.c_str());
+        if (cached.empty()) cached = scan_wifi(g_wlanIface.c_str());
+        if (cached.empty()) {
+            exec(("iw dev " + g_wlanIface + " scan 2>/dev/null").c_str());
+            cached = scan_dump(g_wlanIface.c_str());
+        }
+        std::lock_guard<std::mutex> lock(g_wifiMutex);
+        g_wifiNetworks = cached;
+    }
+
     if (Config::autoConnect && !Config::lastSsid.empty() && !g_wlanIface.empty()) {
         std::string w;
         {
@@ -228,7 +246,8 @@ int main() {
                 }
             }
             if (!w.empty()) {
-                auto fresh = scan_wifi(w.c_str());
+                auto fresh = scan_dump(w.c_str());
+                if (fresh.empty()) fresh = scan_wifi(w.c_str());
                 std::lock_guard<std::mutex> lock(g_wifiMutex);
                 for (const auto& f : fresh) {
                     bool found = false;
@@ -370,7 +389,8 @@ int main() {
                     ImGui::TableSetupColumn(loc().ssid);
                     ImGui::TableSetupColumn(loc().signal);
                     ImGui::TableHeadersRow();
-                    for (const auto& net : networksCopy) {
+                    for (size_t i = 0; i < networksCopy.size(); i++) {
+                        const auto& net = networksCopy[i];
                         if (!searchLower.empty()) {
                             std::string ssidLower = net.ssid;
                             for (auto& c : ssidLower) c = tolower(c);
@@ -378,11 +398,13 @@ int main() {
                         }
                         ImGui::TableNextRow();
                         ImGui::TableSetColumnIndex(0);
+                        ImGui::PushID((int)i);
                         if (ImGui::Selectable(net.ssid.c_str(), false, ImGuiSelectableFlags_SpanAllColumns)) {
                             connectSsid = net.ssid;
                             passBuf[0] = '\0';
                             showConnect = true;
                         }
+                        ImGui::PopID();
                         ImGui::TableSetColumnIndex(1);
                         ImGui::Text("%d dBm", net.signal);
                     }

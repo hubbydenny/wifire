@@ -8,7 +8,7 @@ namespace Config {
   int fontSize = 15;
   bool autoConnect = false;
   bool autostart = false;
-  int scanInterval = 1;
+  int scanInterval = 0.5;
   int language = 0;
   std::string lastSsid;
   std::string lastPassword;
