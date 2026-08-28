@@ -1,4 +1,4 @@
-# S-ecosystem
+# Wifire
 
 WiFi manager for Void Linux built with ImGui + OpenGL + GLFW.
 
