@@ -1,6 +1,6 @@
 # S-ecosystem
 
-WiFi manager for Void Linux (musl) built with ImGui + OpenGL + GLFW.
+WiFi manager for Void Linux built with ImGui + OpenGL + GLFW.
 
 ## Features
 
